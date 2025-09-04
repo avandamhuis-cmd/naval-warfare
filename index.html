@@ -6,21 +6,9 @@
 <style>
   body { margin:0; overflow:hidden; }
   canvas { display:block; }
-  #instructions {
-    position:absolute;
-    top:10px;
-    left:10px;
-    color:white;
-    background:rgba(0,0,0,0.5);
-    padding:10px;
-    font-family:sans-serif;
-  }
 </style>
 </head>
 <body>
-<div id="instructions">
-W/A/S/D = Move | Mouse = Look | E = Equip/Unequip Musket | Space = Shoot | Click to activate mouse
-</div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/controls/PointerLockControls.js"></script>
@@ -63,10 +51,8 @@ function createIsland(x,z){
   dock.position.set(x-3,1.1,z);
   scene.add(dock);
 }
-
-// Blue team island
+// Blue and Red Islands
 createIsland(-10,0);
-// Red team island
 createIsland(10,0);
 
 // ----- BOX CREATION -----
@@ -179,7 +165,6 @@ function animate(){
   movePlayer();
   updateBullets();
 
-  // Camera follows player
   camera.position.set(player.position.x, player.position.y+2, player.position.z+5);
   camera.lookAt(player.position.x, player.position.y+1, player.position.z);
 
