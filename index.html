@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Box Battle Game Fixed</title>
+<title>Box Battle Game Clean</title>
 <style>
-  body{margin:0;overflow:hidden;}
-  canvas{display:block;}
-  #instructions{
+  body { margin:0; overflow:hidden; }
+  canvas { display:block; }
+  #instructions {
     position:absolute;
     top:10px;
     left:10px;
@@ -21,31 +21,32 @@
 <div id="instructions">
 W/A/S/D = Move | Mouse = Look | E = Equip/Unequip Musket | Space = Shoot
 </div>
+
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/controls/PointerLockControls.js"></script>
+
 <script>
+// ----- SCENE, CAMERA, RENDERER -----
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
 
-// Camera
-const camera = new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,0.1,1000);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
 camera.position.set(0,2,5);
 
-// Renderer
 const renderer = new THREE.WebGLRenderer();
-renderer.setSize(window.innerWidth,window.innerHeight);
+renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// Controls
+// ----- CONTROLS -----
 const controls = new THREE.PointerLockControls(camera, document.body);
 document.body.addEventListener('click', () => { controls.lock(); });
 
-// Light
+// ----- LIGHT -----
 const light = new THREE.DirectionalLight(0xffffff,1);
 light.position.set(5,10,5);
 scene.add(light);
 
-// Ocean
+// ----- OCEAN -----
 const ocean = new THREE.Mesh(
   new THREE.PlaneGeometry(200,200),
   new THREE.MeshPhongMaterial({color:0x1E90FF, side:THREE.DoubleSide})
@@ -53,37 +54,24 @@ const ocean = new THREE.Mesh(
 ocean.rotation.x = -Math.PI/2;
 scene.add(ocean);
 
-// Blue Island & Dock
-const blueIsland = new THREE.Mesh(
-  new THREE.BoxGeometry(10,1,10),
-  new THREE.MeshPhongMaterial({color:0x228B22})
-);
+// ----- ISLANDS & DOCKS -----
+// Blue Island
+const blueIsland = new THREE.Mesh(new THREE.BoxGeometry(10,1,10), new THREE.MeshPhongMaterial({color:0x228B22}));
 blueIsland.position.set(-15,0.5,0);
 scene.add(blueIsland);
-
-const blueDock = new THREE.Mesh(
-  new THREE.BoxGeometry(4,0.2,2),
-  new THREE.MeshPhongMaterial({color:0x8B4513})
-);
+const blueDock = new THREE.Mesh(new THREE.BoxGeometry(4,0.2,2), new THREE.MeshPhongMaterial({color:0x8B4513}));
 blueDock.position.set(-18,1.1,0);
 scene.add(blueDock);
 
-// Red Island & Dock
-const redIsland = new THREE.Mesh(
-  new THREE.BoxGeometry(10,1,10),
-  new THREE.MeshPhongMaterial({color:0x228B22})
-);
+// Red Island
+const redIsland = new THREE.Mesh(new THREE.BoxGeometry(10,1,10), new THREE.MeshPhongMaterial({color:0x228B22}));
 redIsland.position.set(15,0.5,0);
 scene.add(redIsland);
-
-const redDock = new THREE.Mesh(
-  new THREE.BoxGeometry(4,0.2,2),
-  new THREE.MeshPhongMaterial({color:0x8B4513})
-);
+const redDock = new THREE.Mesh(new THREE.BoxGeometry(4,0.2,2), new THREE.MeshPhongMaterial({color:0x8B4513}));
 redDock.position.set(18,1.1,0);
 scene.add(redDock);
 
-// Boxes
+// ----- BOX CREATION -----
 function createBox(color,x,z){
   const box = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), new THREE.MeshPhongMaterial({color:color}));
   box.position.set(x,1,z);
@@ -91,39 +79,41 @@ function createBox(color,x,z){
   return box;
 }
 
-// Blue Player
+// Blue player
 const player = createBox(0x0000ff,-18,0);
-
-// Red Enemy
+// Red enemy
 const enemy = createBox(0xff0000,18,0);
 
-// Movement
-const move = {forward:false,back:false,left:false,right:false};
+// ----- MOVEMENT & INPUT -----
+const move = {forward:false, back:false, left:false, right:false};
+let musketEquipped = false;
+
 document.addEventListener('keydown', e => {
   switch(e.key.toLowerCase()){
-    case 'w': move.forward=true; break;
-    case 's': move.back=true; break;
-    case 'a': move.left=true; break;
-    case 'd': move.right=true; break;
-    case 'e': musketEquipped=!musketEquipped; break;
+    case 'w': move.forward = true; break;
+    case 's': move.back = true; break;
+    case 'a': move.left = true; break;
+    case 'd': move.right = true; break;
+    case 'e': musketEquipped = !musketEquipped; break;
     case ' ': if(musketEquipped) shootMusket(); break;
   }
 });
+
 document.addEventListener('keyup', e => {
   switch(e.key.toLowerCase()){
-    case 'w': move.forward=false; break;
-    case 's': move.back=false; break;
-    case 'a': move.left=false; break;
-    case 'd': move.right=false; break;
+    case 'w': move.forward = false; break;
+    case 's': move.back = false; break;
+    case 'a': move.left = false; break;
+    case 'd': move.right = false; break;
   }
 });
 
-// Musket
-let musketEquipped = false;
+// ----- MUSKET -----
 const bullets = [];
 const particles = [];
 
 function shootMusket(){
+  // Bullet
   const bullet = new THREE.Mesh(new THREE.SphereGeometry(0.1,8,8), new THREE.MeshPhongMaterial({color:0x000000}));
   bullet.position.set(player.position.x,1,player.position.z);
   const direction = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
@@ -131,11 +121,11 @@ function shootMusket(){
   scene.add(bullet);
   bullets.push(bullet);
 
-  // Fire
+  // Fire effect
   for(let i=0;i<3;i++){
     const fire = new THREE.Mesh(new THREE.SphereGeometry(0.1,6,6), new THREE.MeshPhongMaterial({color:0xFFA500}));
     fire.position.copy(player.position).add(new THREE.Vector3(0.5,1+Math.random()*0.2,(Math.random()-0.5)*0.2));
-    fire.life=10+Math.random()*5;
+    fire.life = 10 + Math.random()*5;
     scene.add(fire);
     particles.push(fire);
   }
@@ -143,12 +133,13 @@ function shootMusket(){
   // Smoke
   const smoke = new THREE.Mesh(new THREE.SphereGeometry(0.2,6,6), new THREE.MeshPhongMaterial({color:0x888888, transparent:true, opacity:0.5}));
   smoke.position.copy(player.position).add(new THREE.Vector3(0.5,1.2,0));
-  smoke.life=20; smoke.riseSpeed=0.02;
+  smoke.life = 20;
+  smoke.riseSpeed = 0.02;
   scene.add(smoke);
   particles.push(smoke);
 }
 
-// Update bullets and particles
+// ----- UPDATE BULLETS & PARTICLES -----
 function updateBullets(){
   for(let i=bullets.length-1;i>=0;i--){
     bullets[i].position.addScaledVector(bullets[i].direction,0.3);
@@ -158,19 +149,17 @@ function updateBullets(){
     }
   }
   for(let i=particles.length-1;i>=0;i--){
-    const p = particles[i]; p.life--;
+    const p = particles[i];
+    p.life--;
     if(p.material.opacity!==undefined) p.position.y += p.riseSpeed||0;
-    if(p.life<=0){ scene.remove(p); particles.splice(i,1); }
+    if(p.life <= 0){ scene.remove(p); particles.splice(i,1); }
   }
 }
 
-// Animation loop
-function animate(){
-  requestAnimationFrame(animate);
-
-  // Movement speed
+// ----- PLAYER MOVEMENT -----
+function movePlayer(){
   const pos = player.position;
-  const isSwimming = pos.x<-10||pos.x>10||pos.z<-10||pos.z>10; // outside blue island
+  const isSwimming = pos.x<-10||pos.x>10||pos.z<-10||pos.z>10;
   const speed = isSwimming ? 0.03 : 0.1;
 
   const dir = new THREE.Vector3();
@@ -179,9 +168,15 @@ function animate(){
   if(move.left) dir.x -= 1;
   if(move.right) dir.x += 1;
   dir.applyQuaternion(camera.quaternion);
-  dir.y=0; dir.normalize();
+  dir.y = 0;
+  dir.normalize();
   player.position.addScaledVector(dir,speed);
+}
 
+// ----- ANIMATION LOOP -----
+function animate(){
+  requestAnimationFrame(animate);
+  movePlayer();
   updateBullets();
 
   // Camera follows player
@@ -192,7 +187,7 @@ function animate(){
 }
 animate();
 
-// Resize
+// ----- RESIZE -----
 window.addEventListener('resize',()=>{
   camera.aspect = window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
