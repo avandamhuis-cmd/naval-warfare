@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Box Battle Game Fixed Camera</title>
+<title>Box Battle Game Fixed Full</title>
 <style>
   body { margin:0; overflow:hidden; }
   canvas { display:block; }
@@ -19,7 +19,7 @@
 </head>
 <body>
 <div id="instructions">
-W/A/S/D = Move | Mouse = Look | E = Equip/Unequip Musket | Space = Shoot
+W/A/S/D = Move | Mouse = Look | E = Equip/Unequip Musket | Space = Shoot | Click to activate mouse
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
@@ -63,8 +63,11 @@ function createIsland(x,z){
   dock.position.set(x-3,1.1,z);
   scene.add(dock);
 }
-createIsland(-15,0); // blue team
-createIsland(15,0);  // red team
+
+// Blue team island
+createIsland(-10,0);
+// Red team island
+createIsland(10,0);
 
 // ----- BOX CREATION -----
 function createBox(color,x,z){
@@ -74,12 +77,13 @@ function createBox(color,x,z){
   return box;
 }
 
-const player = createBox(0x0000ff,-18,0); // blue player
-const enemy = createBox(0xff0000,18,0);   // red enemy
+// ----- PLAYER & ENEMY -----
+const player = createBox(0x0000ff, -10, 0);
+const enemy = createBox(0xff0000, 10, 0);
 
-// ----- INITIAL CAMERA POSITION -----
-camera.position.set(player.position.x, player.position.y + 1.5, player.position.z + 5);
-camera.lookAt(player.position.x, player.position.y + 1, player.position.z);
+// ----- CAMERA START POSITION -----
+camera.position.set(player.position.x, player.position.y+2, player.position.z+5);
+camera.lookAt(player.position.x, player.position.y+1, player.position.z);
 
 // ----- INPUT -----
 const move = {forward:false, back:false, left:false, right:false};
@@ -155,7 +159,7 @@ function updateBullets(){
 // ----- PLAYER MOVEMENT -----
 function movePlayer(){
   const pos = player.position;
-  const isSwimming = pos.x<-10||pos.x>10||pos.z<-10||pos.z>10;
+  const isSwimming = pos.x<-5||pos.x>5||pos.z<-5||pos.z>5;
   const speed = isSwimming ? 0.03 : 0.1;
 
   const dir = new THREE.Vector3();
@@ -164,7 +168,7 @@ function movePlayer(){
   if(move.left) dir.x -= 1;
   if(move.right) dir.x += 1;
   dir.applyQuaternion(camera.quaternion);
-  dir.y=0;
+  dir.y = 0;
   dir.normalize();
   player.position.addScaledVector(dir,speed);
 }
@@ -175,7 +179,8 @@ function animate(){
   movePlayer();
   updateBullets();
 
-  camera.position.set(player.position.x, player.position.y+1.5, player.position.z+5);
+  // Camera follows player
+  camera.position.set(player.position.x, player.position.y+2, player.position.z+5);
   camera.lookAt(player.position.x, player.position.y+1, player.position.z);
 
   renderer.render(scene,camera);
