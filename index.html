@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Box Battle Game Fixed Full</title>
+<title>Box Battle Game Fixed Positions</title>
 <style>
   body { margin:0; overflow:hidden; }
   canvas { display:block; }
@@ -51,8 +51,10 @@ function createIsland(x,z){
   dock.position.set(x-3,1.1,z);
   scene.add(dock);
 }
-// Blue and Red Islands
-createIsland(-10,0);
+
+// Blue island near player
+createIsland(-2,0);
+// Red island
 createIsland(10,0);
 
 // ----- BOX CREATION -----
@@ -64,8 +66,8 @@ function createBox(color,x,z){
 }
 
 // ----- PLAYER & ENEMY -----
-const player = createBox(0x0000ff, -10, 0);
-const enemy = createBox(0xff0000, 10, 0);
+const player = createBox(0x0000ff, 0, 0); // player in center
+const enemy = createBox(0xff0000, 8, 0);  // red enemy visible
 
 // ----- CAMERA START POSITION -----
 camera.position.set(player.position.x, player.position.y+2, player.position.z+5);
