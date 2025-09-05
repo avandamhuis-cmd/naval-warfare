@@ -2,26 +2,35 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Blocky Naval Game</title>
+<title>Naval Game Musket Equip/Unequip</title>
 <style>
 body { margin:0; overflow:hidden; }
 canvas { display:block; }
 #info { position:absolute; top:10px; left:10px; color:white; font-family:sans-serif;}
+#inventory {
+  position:absolute; bottom:10px; left:50%; transform:translateX(-50%);
+  background: rgba(0,0,0,0.5); padding:5px 10px; border-radius:5px; color:white;
+  font-family:sans-serif; font-size:16px;
+}
+#status { margin-left:5px; }
+#reload { color:orange; display:inline-block; margin-left:10px;}
 </style>
 </head>
 <body>
-<div id="info">Click to lock mouse. WASD to move, SPACE to jump/swim.</div>
+<div id="info">Click to lock mouse. WASD move, SPACE jump/swim, Right Click fire, Left Click aim, R reload, 1 equip/unequip musket</div>
+<div id="inventory">Musket <span id="status"></span> <span id="reload"></span></div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
 <script>
+
+// --- Scene ---
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87ceeb);
-
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+const camera = new THREE.PerspectiveCamera(75,window.innerWidth/window.innerHeight,0.1,1000);
 const renderer = new THREE.WebGLRenderer();
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(window.innerWidth,window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// FPS hierarchy
+// --- FPS hierarchy ---
 const yawObject = new THREE.Object3D();
 const pitchObject = new THREE.Object3D();
 pitchObject.add(camera);
@@ -29,13 +38,13 @@ yawObject.add(pitchObject);
 scene.add(yawObject);
 yawObject.position.set(0,1.8,5);
 
-// Lights
+// --- Lights ---
 const light = new THREE.DirectionalLight(0xffffff,1);
 light.position.set(10,20,10);
 scene.add(light);
 scene.add(new THREE.AmbientLight(0x666666));
 
-// Island
+// --- Island ---
 const island = new THREE.Mesh(
   new THREE.BoxGeometry(20,2,20),
   new THREE.MeshLambertMaterial({color:0x228B22})
@@ -43,7 +52,7 @@ const island = new THREE.Mesh(
 island.position.set(0,-1,0);
 scene.add(island);
 
-// Dock
+// --- Dock ---
 for(let i=-2;i<=2;i++){
   const plank = new THREE.Mesh(
     new THREE.BoxGeometry(1,0.3,2),
@@ -53,25 +62,26 @@ for(let i=-2;i<=2;i++){
   scene.add(plank);
 }
 
-// Water
+// --- Water ---
 const waterGeometry = new THREE.PlaneGeometry(200,200,100,100);
 const waterMaterial = new THREE.MeshLambertMaterial({color:0x1E90FF,side:THREE.DoubleSide});
-const water = new THREE.Mesh(waterGeometry, waterMaterial);
-water.rotation.x = -Math.PI/2;
-water.position.y = -2;
+const water = new THREE.Mesh(waterGeometry,waterMaterial);
+water.rotation.x=-Math.PI/2;
+water.position.y=-2;
 scene.add(water);
 const waterPositions = water.geometry.attributes.position;
 
-// Player
-let player = {height:1.8,speed:0.15,swimSpeed:0.07,jumpPower:0.25,yVelocity:0,isJumping:false,isSwimming:false};
+// --- Player ---
+let player={height:1.8,speed:0.15,swimSpeed:0.07,jumpPower:0.25,yVelocity:0,isJumping:false,isSwimming:false};
 let keys={};
 
-// Input
+// --- Input ---
 document.addEventListener('keydown',e=>keys[e.code]=true);
 document.addEventListener('keyup',e=>keys[e.code]=false);
 
-// Mouse
+// --- Mouse ---
 let mouseLocked=false;
+let aiming=false;
 document.body.addEventListener("click",()=>{if(!mouseLocked)document.body.requestPointerLock();});
 document.addEventListener("pointerlockchange",()=>{mouseLocked=(document.pointerLockElement===document.body);});
 document.addEventListener("mousemove",e=>{
@@ -82,10 +92,91 @@ document.addEventListener("mousemove",e=>{
   }
 });
 
-// Animate loop
+// --- Inventory & Musket ---
+let canShoot=true;
+let isReloading=false;
+let musketEquipped=true;
+const reloadUI=document.getElementById("reload");
+const statusUI=document.getElementById("status");
+
+// Positions for equip/holster
+const equipPosition = new THREE.Vector3(0,-0.1,-0.5); // first-person
+const holsterPosition = new THREE.Vector3(0,0.5,0.3); // back
+
+// Musket (cube)
+const musket = new THREE.Mesh(
+  new THREE.BoxGeometry(0.1,0.1,1),
+  new THREE.MeshLambertMaterial({color:0x333333})
+);
+musket.position.copy(equipPosition);
+camera.add(musket);
+
+// Muzzle flash
+const muzzleFlash = new THREE.Mesh(
+  new THREE.SphereGeometry(0.05,8,8),
+  new THREE.MeshBasicMaterial({color:0xffaa00})
+);
+muzzleFlash.visible=false;
+camera.add(muzzleFlash);
+
+// Smoke
+const smoke = new THREE.Mesh(
+  new THREE.SphereGeometry(0.07,8,8),
+  new THREE.MeshBasicMaterial({color:0x888888,transparent:true,opacity:0.5})
+);
+smoke.visible=false;
+camera.add(smoke);
+
+// --- Functions ---
+function fireMusket(){
+  if(!canShoot || isReloading || !musketEquipped) return;
+  canShoot=false;
+  muzzleFlash.visible=true;
+  smoke.visible=true;
+  setTimeout(()=>{muzzleFlash.visible=false; smoke.visible=false},200);
+}
+
+function reloadMusket(){
+  if(isReloading || !musketEquipped) return;
+  isReloading=true;
+  aiming=false;
+  musket.position.copy(holsterPosition); // dip
+  let reloadTime=7;
+  reloadUI.innerText=`Reloading: ${reloadTime}s`;
+  const interval = setInterval(()=>{
+    reloadTime--;
+    if(reloadTime>0) reloadUI.innerText=`Reloading: ${reloadTime}s`;
+    else {
+      reloadUI.innerText="";
+      clearInterval(interval);
+      canShoot=true;
+      isReloading=false;
+      musket.position.copy(equipPosition);
+    }
+  },1000);
+}
+
+// --- Mouse buttons ---
+document.addEventListener("mousedown",e=>{
+  if(e.button===0) aiming=true; // left click = aim
+  if(e.button===2) fireMusket(); // right click = fire
+});
+document.addEventListener("mouseup",e=>{
+  if(e.button===0) aiming=false;
+});
+document.addEventListener("contextmenu",e=>e.preventDefault()); // disable context menu
+
+// 1 key toggles equip/unequip
+document.addEventListener("keydown",e=>{
+  if(e.code==="Digit1" && !isReloading){
+    musketEquipped = !musketEquipped;
+  }
+  if(e.code==="KeyR") reloadMusket();
+});
+
+// --- Animate ---
 function animate(){
   requestAnimationFrame(animate);
-
   const time = Date.now()*0.001;
 
   // Waves
@@ -98,47 +189,41 @@ function animate(){
   waterPositions.needsUpdate=true;
 
   // Movement
-  let move = new THREE.Vector3();
-  if(keys["KeyW"]) move.z -= 1;
-  if(keys["KeyS"]) move.z += 1;
-  if(keys["KeyA"]) move.x -= 1;
-  if(keys["KeyD"]) move.x += 1;
+  let move=new THREE.Vector3();
+  if(keys["KeyW"]) move.z-=1;
+  if(keys["KeyS"]) move.z+=1;
+  if(keys["KeyA"]) move.x-=1;
+  if(keys["KeyD"]) move.x+=1;
   move.normalize();
 
-  // Check if swimming
   player.isSwimming = (yawObject.position.y < water.position.y + 0.3);
 
   if(player.isSwimming){
-    // Swimming movement
     yawObject.translateX(move.x*player.swimSpeed);
     yawObject.translateZ(move.z*player.swimSpeed);
-    // bobbing
-    player.yVelocity = Math.sin(time*3)*0.01;
-    // Jump out of water
-    if(keys["Space"]){
-      player.yVelocity = player.jumpPower;
-      player.isSwimming = false;
-    }
+    player.yVelocity=Math.sin(time*3)*0.01;
+    if(keys["Space"]){player.yVelocity=player.jumpPower; player.isSwimming=false;}
   } else {
-    // Walking
     yawObject.translateX(move.x*player.speed);
     yawObject.translateZ(move.z*player.speed);
-    // Gravity
-    if(yawObject.position.y > player.height){
-      player.yVelocity -= 0.015;
-    } else {
-      yawObject.position.y = player.height;
-      player.yVelocity = 0;
-      player.isJumping = false;
-    }
-    // Jump
-    if(keys["Space"] && yawObject.position.y <= player.height + 0.01){
-      player.yVelocity = player.jumpPower;
-      player.isJumping = true;
-    }
+    if(yawObject.position.y>player.height) player.yVelocity-=0.015;
+    else { yawObject.position.y=player.height; player.yVelocity=0; player.isJumping=false; }
+    if(keys["Space"] && yawObject.position.y<=player.height+0.01){player.yVelocity=player.jumpPower; player.isJumping=true;}
   }
 
   yawObject.position.y += player.yVelocity;
+
+  // --- Musket equip/unequip animation ---
+  const targetPos = musketEquipped ? equipPosition : holsterPosition;
+  musket.position.lerp(targetPos, 0.1);
+
+  // Aiming animation (only if equipped)
+  if(musketEquipped && aiming && !isReloading){
+    musket.position.y = targetPos.y + 0.1; // move up slightly
+  }
+
+  // --- Update Inventory Status ---
+  statusUI.innerText = musketEquipped ? "[Equipped]" : "[On Back]";
 
   renderer.render(scene,camera);
 }
