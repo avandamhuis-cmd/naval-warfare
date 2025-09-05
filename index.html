@@ -10,7 +10,7 @@
   </style>
 </head>
 <body>
-  <div id="info">Click to lock mouse. Use WASD to move, SPACE to jump.</div>
+  <div id="info">Click to lock mouse. WASD to move, SPACE to jump.</div>
   <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
 
   <script>
@@ -22,6 +22,16 @@
     const renderer = new THREE.WebGLRenderer();
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
+
+    // === Yaw + Pitch system ===
+    const yawObject = new THREE.Object3D();
+    const pitchObject = new THREE.Object3D();
+    pitchObject.add(camera);
+    yawObject.add(pitchObject);
+    scene.add(yawObject);
+
+    // Position player start
+    yawObject.position.set(0, 1.8, 5);
 
     // === Lights ===
     const light = new THREE.DirectionalLight(0xffffff, 1);
@@ -37,7 +47,7 @@
     island.position.set(0, -1, 0);
     scene.add(island);
 
-    // === Dock ===
+    // === Dock (multiple planks) ===
     for (let i = -2; i <= 2; i++) {
       const plank = new THREE.Mesh(
         new THREE.BoxGeometry(1, 0.3, 2),
@@ -47,17 +57,16 @@
       scene.add(plank);
     }
 
-    // === Sea (lowered) ===
+    // === Sea (lowered + waves) ===
     const waterGeometry = new THREE.PlaneGeometry(200, 200, 100, 100);
     const waterMaterial = new THREE.MeshLambertMaterial({ color: 0x1E90FF, side: THREE.DoubleSide });
     const water = new THREE.Mesh(waterGeometry, waterMaterial);
     water.rotation.x = -Math.PI / 2;
-    water.position.y = -2; // lower sea so waves don’t clip island
+    water.position.y = -2; // lower sea
     scene.add(water);
-
     const waterPositions = water.geometry.attributes.position;
 
-    // === Player ===
+    // === Player properties ===
     let player = {
       height: 1.8,
       speed: 0.15,
@@ -68,35 +77,32 @@
       isSwimming: false
     };
 
-    camera.position.set(0, player.height, 5);
-
     // === Input ===
     let keys = {};
     document.addEventListener('keydown', e => keys[e.code] = true);
     document.addEventListener('keyup', e => keys[e.code] = false);
 
-    let yaw = 0, pitch = 0;
     let mouseLocked = false;
-
     document.body.addEventListener("click", () => {
       if (!mouseLocked) document.body.requestPointerLock();
     });
     document.addEventListener("pointerlockchange", () => {
       mouseLocked = (document.pointerLockElement === document.body);
     });
+
     document.addEventListener("mousemove", e => {
       if (mouseLocked) {
-        yaw -= e.movementX * 0.002;
-        pitch -= e.movementY * 0.002;
-        pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+        yawObject.rotation.y -= e.movementX * 0.002; // yaw left/right
+        pitchObject.rotation.x -= e.movementY * 0.002; // pitch up/down
+        pitchObject.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitchObject.rotation.x));
       }
     });
 
-    // === Loop ===
+    // === Game loop ===
     function animate() {
       requestAnimationFrame(animate);
 
-      // Waves
+      // Waves animation
       const time = Date.now() * 0.001;
       for (let i = 0; i < waterPositions.count; i++) {
         const x = waterPositions.getX(i);
@@ -106,48 +112,44 @@
       }
       waterPositions.needsUpdate = true;
 
-      // Movement direction based on camera
-      const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)).normalize();
-      const right = new THREE.Vector3(forward.z, 0, -forward.x).normalize();
-
+      // Movement
       let move = new THREE.Vector3();
-      if (keys["KeyW"]) move.add(forward);
-      if (keys["KeyS"]) move.sub(forward);
-      if (keys["KeyA"]) move.sub(right);
-      if (keys["KeyD"]) move.add(right);
+      if (keys["KeyW"]) move.z -= 1;
+      if (keys["KeyS"]) move.z += 1;
+      if (keys["KeyA"]) move.x -= 1;
+      if (keys["KeyD"]) move.x += 1;
+      move.normalize();
 
       if (player.isSwimming) {
-        camera.position.add(move.multiplyScalar(player.swimSpeed));
+        yawObject.translateOnAxis(move, player.swimSpeed);
         player.yVelocity = Math.sin(Date.now() * 0.003) * 0.01;
       } else {
-        camera.position.add(move.multiplyScalar(player.speed));
+        yawObject.translateOnAxis(move, player.speed);
 
-        if (camera.position.y > player.height) {
-          player.yVelocity -= 0.015;
+        if (yawObject.position.y > player.height) {
+          player.yVelocity -= 0.015; // gravity
         } else {
-          camera.position.y = player.height;
+          yawObject.position.y = player.height;
           player.yVelocity = 0;
           player.isJumping = false;
         }
 
-        if (keys["Space"] && camera.position.y <= player.height + 0.01) {
+        if (keys["Space"] && yawObject.position.y <= player.height + 0.01) {
           player.yVelocity = player.jumpPower;
           player.isJumping = true;
         }
       }
 
-      camera.position.y += player.yVelocity;
+      yawObject.position.y += player.yVelocity;
 
-      // Swimming check (sea is at y=-2)
-      player.isSwimming = (camera.position.y < -1.8);
-
-      // Apply rotation
-      camera.rotation.set(pitch, yaw, 0);
+      // Swimming check (water surface at y=-2)
+      player.isSwimming = (yawObject.position.y < -1.8);
 
       renderer.render(scene, camera);
     }
     animate();
 
+    // Resize handling
     window.addEventListener("resize", () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
