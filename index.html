@@ -1,187 +1,158 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Minimal Box Battle Game</title>
-<style>
-  body { margin:0; overflow:hidden; }
-  canvas { display:block; }
-</style>
+  <meta charset="UTF-8">
+  <title>Blocky Naval Game</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+    #info { position: absolute; top: 10px; left: 10px; color: white; font-family: sans-serif; }
+  </style>
 </head>
 <body>
+  <div id="info">Click to lock mouse. Use WASD to move, SPACE to jump.</div>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/controls/PointerLockControls.js"></script>
+  <script>
+    // === Scene ===
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb); // sky
 
-<script>
-// --- SCENE & CAMERA ---
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x87CEEB);
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
 
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    // === Lights ===
+    const light = new THREE.DirectionalLight(0xffffff, 1);
+    light.position.set(10, 20, 10);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0x666666));
 
-// --- RENDERER ---
-const renderer = new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
+    // === Island ===
+    const island = new THREE.Mesh(
+      new THREE.BoxGeometry(20, 2, 20),
+      new THREE.MeshLambertMaterial({ color: 0x228B22 })
+    );
+    island.position.set(0, -1, 0);
+    scene.add(island);
 
-// --- CONTROLS ---
-const controls = new THREE.PointerLockControls(camera, document.body);
-document.body.addEventListener('click', () => controls.lock());
-
-// --- LIGHT ---
-const light = new THREE.DirectionalLight(0xffffff, 1);
-light.position.set(5,10,5);
-scene.add(light);
-
-// --- OCEAN ---
-const ocean = new THREE.Mesh(
-  new THREE.PlaneGeometry(200, 200),
-  new THREE.MeshPhongMaterial({color:0x1E90FF, side:THREE.DoubleSide})
-);
-ocean.rotation.x = -Math.PI/2;
-scene.add(ocean);
-
-// --- ISLANDS ---
-function createIsland(x, z) {
-  const island = new THREE.Mesh(new THREE.BoxGeometry(10,1,10), new THREE.MeshPhongMaterial({color:0x228B22}));
-  island.position.set(x,0.5,z);
-  scene.add(island);
-  const dock = new THREE.Mesh(new THREE.BoxGeometry(4,0.2,2), new THREE.MeshPhongMaterial({color:0x8B4513}));
-  dock.position.set(x-3,1.1,z);
-  scene.add(dock);
-}
-
-// Blue island near center
-createIsland(-3, 0);
-// Red island
-createIsland(8, 0);
-
-// --- PLAYER & ENEMY ---
-function createBox(color,x,z){
-  const box = new THREE.Mesh(new THREE.BoxGeometry(1,2,1), new THREE.MeshPhongMaterial({color:color}));
-  box.position.set(x,1,z);
-  scene.add(box);
-  return box;
-}
-
-const player = createBox(0x0000ff, 0, 0);
-const enemy = createBox(0xff0000, 5, 0);
-
-// --- CAMERA START ---
-camera.position.set(player.position.x, player.position.y + 2, player.position.z + 5);
-camera.lookAt(player.position.x, player.position.y + 1, player.position.z);
-
-// --- MOVEMENT & INPUT ---
-const move = {forward:false, back:false, left:false, right:false};
-let musketEquipped = false;
-
-document.addEventListener('keydown', e => {
-  switch(e.key.toLowerCase()) {
-    case 'w': move.forward = true; break;
-    case 's': move.back = true; break;
-    case 'a': move.left = true; break;
-    case 'd': move.right = true; break;
-    case 'e': musketEquipped = !musketEquipped; break;
-    case ' ': if(musketEquipped) shootMusket(); break;
-  }
-});
-
-document.addEventListener('keyup', e => {
-  switch(e.key.toLowerCase()) {
-    case 'w': move.forward = false; break;
-    case 's': move.back = false; break;
-    case 'a': move.left = false; break;
-    case 'd': move.right = false; break;
-  }
-});
-
-// --- MUSKET ---
-const bullets = [];
-const particles = [];
-
-function shootMusket() {
-  const bullet = new THREE.Mesh(
-    new THREE.SphereGeometry(0.1,8,8),
-    new THREE.MeshPhongMaterial({color:0x000000})
-  );
-  bullet.position.set(player.position.x,1,player.position.z);
-  const direction = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
-  bullet.direction = direction.clone().normalize();
-  scene.add(bullet);
-  bullets.push(bullet);
-
-  // Fire effect
-  for(let i=0;i<3;i++){
-    const fire = new THREE.Mesh(new THREE.SphereGeometry(0.1,6,6), new THREE.MeshPhongMaterial({color:0xFFA500}));
-    fire.position.copy(player.position).add(new THREE.Vector3(0.5,1+Math.random()*0.2,(Math.random()-0.5)*0.2));
-    fire.life = 10 + Math.random()*5;
-    scene.add(fire);
-    particles.push(fire);
-  }
-
-  // Smoke
-  const smoke = new THREE.Mesh(new THREE.SphereGeometry(0.2,6,6), new THREE.MeshPhongMaterial({color:0x888888, transparent:true, opacity:0.5}));
-  smoke.position.copy(player.position).add(new THREE.Vector3(0.5,1.2,0));
-  smoke.life = 20;
-  smoke.riseSpeed = 0.02;
-  scene.add(smoke);
-  particles.push(smoke);
-}
-
-// --- UPDATE BULLETS & PARTICLES ---
-function updateBullets(){
-  for(let i=bullets.length-1;i>=0;i--){
-    bullets[i].position.addScaledVector(bullets[i].direction,0.3);
-    if(bullets[i].position.distanceTo(player.position) > 100){
-      scene.remove(bullets[i]);
-      bullets.splice(i,1);
+    // === Dock ===
+    for (let i = -2; i <= 2; i++) {
+      const plank = new THREE.Mesh(
+        new THREE.BoxGeometry(1, 0.3, 2),
+        new THREE.MeshLambertMaterial({ color: 0x8B4513 })
+      );
+      plank.position.set(i * 1.2, 0, -11);
+      scene.add(plank);
     }
-  }
-  for(let i=particles.length-1;i>=0;i--){
-    const p = particles[i];
-    p.life--;
-    if(p.material.opacity!==undefined) p.position.y += p.riseSpeed||0;
-    if(p.life<=0){ scene.remove(p); particles.splice(i,1); }
-  }
-}
 
-// --- PLAYER MOVEMENT ---
-function movePlayer(){
-  const pos = player.position;
-  const isSwimming = pos.x<-5||pos.x>5||pos.z<-5||pos.z>5;
-  const speed = isSwimming ? 0.03 : 0.1;
+    // === Sea (lowered) ===
+    const waterGeometry = new THREE.PlaneGeometry(200, 200, 100, 100);
+    const waterMaterial = new THREE.MeshLambertMaterial({ color: 0x1E90FF, side: THREE.DoubleSide });
+    const water = new THREE.Mesh(waterGeometry, waterMaterial);
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = -2; // lower sea so waves don’t clip island
+    scene.add(water);
 
-  const dir = new THREE.Vector3();
-  if(move.forward) dir.z -= 1;
-  if(move.back) dir.z += 1;
-  if(move.left) dir.x -= 1;
-  if(move.right) dir.x += 1;
-  dir.applyQuaternion(camera.quaternion);
-  dir.y = 0;
-  dir.normalize();
-  player.position.addScaledVector(dir,speed);
-}
+    const waterPositions = water.geometry.attributes.position;
 
-// --- ANIMATION LOOP ---
-function animate(){
-  requestAnimationFrame(animate);
-  movePlayer();
-  updateBullets();
+    // === Player ===
+    let player = {
+      height: 1.8,
+      speed: 0.15,
+      swimSpeed: 0.07,
+      jumpPower: 0.25,
+      yVelocity: 0,
+      isJumping: false,
+      isSwimming: false
+    };
 
-  camera.position.set(player.position.x, player.position.y + 2, player.position.z + 5);
-  camera.lookAt(player.position.x, player.position.y + 1, player.position.z);
+    camera.position.set(0, player.height, 5);
 
-  renderer.render(scene,camera);
-}
-animate();
+    // === Input ===
+    let keys = {};
+    document.addEventListener('keydown', e => keys[e.code] = true);
+    document.addEventListener('keyup', e => keys[e.code] = false);
 
-// --- RESIZE ---
-window.addEventListener('resize',()=>{
-  camera.aspect = window.innerWidth/window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth,window.innerHeight);
-});
-</script>
+    let yaw = 0, pitch = 0;
+    let mouseLocked = false;
+
+    document.body.addEventListener("click", () => {
+      if (!mouseLocked) document.body.requestPointerLock();
+    });
+    document.addEventListener("pointerlockchange", () => {
+      mouseLocked = (document.pointerLockElement === document.body);
+    });
+    document.addEventListener("mousemove", e => {
+      if (mouseLocked) {
+        yaw -= e.movementX * 0.002;
+        pitch -= e.movementY * 0.002;
+        pitch = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitch));
+      }
+    });
+
+    // === Loop ===
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // Waves
+      const time = Date.now() * 0.001;
+      for (let i = 0; i < waterPositions.count; i++) {
+        const x = waterPositions.getX(i);
+        const y = waterPositions.getY(i);
+        const wave = Math.sin(x * 0.15 + time) * 0.1 + Math.cos(y * 0.15 + time) * 0.1;
+        waterPositions.setZ(i, wave);
+      }
+      waterPositions.needsUpdate = true;
+
+      // Movement direction based on camera
+      const forward = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw)).normalize();
+      const right = new THREE.Vector3(forward.z, 0, -forward.x).normalize();
+
+      let move = new THREE.Vector3();
+      if (keys["KeyW"]) move.add(forward);
+      if (keys["KeyS"]) move.sub(forward);
+      if (keys["KeyA"]) move.sub(right);
+      if (keys["KeyD"]) move.add(right);
+
+      if (player.isSwimming) {
+        camera.position.add(move.multiplyScalar(player.swimSpeed));
+        player.yVelocity = Math.sin(Date.now() * 0.003) * 0.01;
+      } else {
+        camera.position.add(move.multiplyScalar(player.speed));
+
+        if (camera.position.y > player.height) {
+          player.yVelocity -= 0.015;
+        } else {
+          camera.position.y = player.height;
+          player.yVelocity = 0;
+          player.isJumping = false;
+        }
+
+        if (keys["Space"] && camera.position.y <= player.height + 0.01) {
+          player.yVelocity = player.jumpPower;
+          player.isJumping = true;
+        }
+      }
+
+      camera.position.y += player.yVelocity;
+
+      // Swimming check (sea is at y=-2)
+      player.isSwimming = (camera.position.y < -1.8);
+
+      // Apply rotation
+      camera.rotation.set(pitch, yaw, 0);
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener("resize", () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
 </body>
 </html>
