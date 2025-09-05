@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Naval Game - Musket Fixed Forward</title>
+<title>Naval Game - Musket Improved</title>
 <style>
 body { margin:0; overflow:hidden; }
 canvas { display:block; }
@@ -117,33 +117,46 @@ const holsterPosition = new THREE.Vector3(0, 0.5, 0.3);
 const musket=new THREE.Object3D(); 
 camera.add(musket);
 
-// Stock (wood)
-const stockGeo=new THREE.CylinderGeometry(0.04,0.05,0.6,12);
-const stock=new THREE.Mesh(stockGeo,new THREE.MeshLambertMaterial({color:0x8B4513}));
-stock.rotation.x=Math.PI/2;
-stock.position.set(0,-0.05,-0.3);
-musket.add(stock);
+// Wooden stock (rectangular body behind barrel)
+const stock = new THREE.Mesh(
+  new THREE.BoxGeometry(0.12,0.25,0.6),
+  new THREE.MeshLambertMaterial({color:0x8B4513})
+);
+stock.position.set(0,-0.1,-0.2); musket.add(stock);
 
-// Barrel
-const barrel=new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,1.0,16),new THREE.MeshLambertMaterial({color:0x333333}));
-barrel.rotation.x=Math.PI/2;
-barrel.position.set(0,-0.02,0.3);
-musket.add(barrel);
+// Butt of stock
+const butt = new THREE.Mesh(
+  new THREE.BoxGeometry(0.18,0.25,0.2),
+  new THREE.MeshLambertMaterial({color:0x5a3010})
+);
+butt.position.set(0,-0.1,-0.55); musket.add(butt);
 
-// Tip
-const tip=new THREE.Mesh(new THREE.CylinderGeometry(0.016,0.016,0.05,16),new THREE.MeshLambertMaterial({color:0xaaaaaa}));
-tip.rotation.x=Math.PI/2; 
-tip.position.set(0,-0.02,0.8);
-musket.add(tip);
+// Barrel (metal)
+const barrel = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.01,0.01,1.2,16),
+  new THREE.MeshLambertMaterial({color:0x444444})
+);
+barrel.rotation.x=Math.PI/2; barrel.position.set(0,-0.02,0.4); musket.add(barrel);
+
+// Tip (muzzle)
+const tip = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.012,0.012,0.05,12),
+  new THREE.MeshLambertMaterial({color:0xaaaaaa})
+);
+tip.rotation.x=Math.PI/2; tip.position.set(0,-0.02,1.0); musket.add(tip);
 
 // Sights
-const frontSight=new THREE.Mesh(new THREE.SphereGeometry(0.01,8,8),new THREE.MeshLambertMaterial({color:0xff0000}));
-frontSight.position.set(0,0.02,0.8);
-musket.add(frontSight);
+const frontSight = new THREE.Mesh(
+  new THREE.SphereGeometry(0.01,8,8),
+  new THREE.MeshLambertMaterial({color:0xff0000})
+);
+frontSight.position.set(0,0.03,1.0); musket.add(frontSight);
 
-const rearSight=new THREE.Mesh(new THREE.BoxGeometry(0.01,0.02,0.02),new THREE.MeshLambertMaterial({color:0x000000}));
-rearSight.position.set(0,0.02,-0.2);
-musket.add(rearSight);
+const rearSight = new THREE.Mesh(
+  new THREE.BoxGeometry(0.01,0.02,0.02),
+  new THREE.MeshLambertMaterial({color:0x000000})
+);
+rearSight.position.set(0,0.02,-0.2); musket.add(rearSight);
 
 // Flash
 const muzzleFlash=new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8),new THREE.MeshBasicMaterial({color:0xffaa00}));
@@ -151,7 +164,7 @@ muzzleFlash.visible=false; musket.add(muzzleFlash);
 
 // Smoke
 const smoke=new THREE.Mesh(new THREE.SphereGeometry(0.07,8,8),new THREE.MeshBasicMaterial({color:0x888888,transparent:true,opacity:0.5}));
-smoke.position.set(0,0.02,0.8); smoke.visible=false; musket.add(smoke);
+smoke.position.set(0,0.02,1.0); smoke.visible=false; musket.add(smoke);
 let smokeLife=0;
 
 // --- Sound ---
@@ -164,10 +177,19 @@ new THREE.AudioLoader().load('https://actions.google.com/sounds/v1/weapons/muske
 // --- Bullets ---
 let bullets=[]; const collidables=[island,...dockPlanks,...dockPillars];
 function spawnBullet(){
-  const bullet=new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8),new THREE.MeshLambertMaterial({color:0x888888}));
-  const tipWorldPos=new THREE.Vector3(); tip.getWorldPosition(tipWorldPos); bullet.position.copy(tipWorldPos);
-  const dir=new THREE.Vector3(); camera.getWorldDirection(dir);
-  bullet.userData={velocity:dir.normalize().multiplyScalar(1),spawnTime:performance.now()}; scene.add(bullet); bullets.push(bullet);
+  const bullet = new THREE.Mesh(
+    new THREE.SphereGeometry(0.05,8,8),
+    new THREE.MeshLambertMaterial({color:0x888888})
+  );
+  const tipWorldPos = new THREE.Vector3(); 
+  tip.getWorldPosition(tipWorldPos);
+  const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
+
+  // spawn slightly ahead of barrel
+  bullet.position.copy(tipWorldPos).add(dir.clone().multiplyScalar(0.1));
+
+  bullet.userData = { velocity: dir.normalize().multiplyScalar(1), spawnTime: performance.now() };
+  scene.add(bullet); bullets.push(bullet);
 }
 function updateBullets(delta){
   const now=performance.now();
@@ -230,6 +252,7 @@ function animate(){
 animate();
 
 window.addEventListener("resize",()=>{camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();renderer.setSize(window.innerWidth,window.innerHeight);});
+
 </script>
 </body>
 </html>
