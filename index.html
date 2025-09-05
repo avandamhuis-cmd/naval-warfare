@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Naval Game - Musket with Smoke Fade</title>
+<title>Naval Game - Musket Fixed</title>
 <style>
 body { margin:0; overflow:hidden; }
 canvas { display:block; }
@@ -49,9 +49,12 @@ yawObject.add(pitchObject);
 scene.add(yawObject);
 yawObject.position.set(0,1.8,5);
 
-// --- Lights ---
-scene.add(new THREE.DirectionalLight(0xffffff,1).position.set(10,20,10));
-scene.add(new THREE.AmbientLight(0x666666));
+// --- Lights (brighter daylight) ---
+const sun = new THREE.DirectionalLight(0xffffff,1.2);
+sun.position.set(50,100,50);
+scene.add(sun);
+scene.add(new THREE.AmbientLight(0xffffff,0.6));
+scene.add(new THREE.HemisphereLight(0x87ceeb,0x228B22,0.4));
 
 // --- Island ---
 const island = new THREE.Mesh(
@@ -105,37 +108,42 @@ document.addEventListener("mousemove",e=>{
 // --- Musket ---
 let canShoot=true,isReloading=false,musketEquipped=true,ammo=1,isAiming=false;
 const reloadUI=document.getElementById("reload"),statusUI=document.getElementById("status"),crosshair=document.getElementById("crosshair");
-const equipPosition=new THREE.Vector3(0,-0.1,-0.5);
+
+// Position offsets
+const equipPosition=new THREE.Vector3(0,-0.1,-0.7);
 const holsterPosition=new THREE.Vector3(0,0.5,0.3);
-const adsPosition=new THREE.Vector3(0,-0.02,-0.25);
+const adsPosition=new THREE.Vector3(0,-0.05,-0.5);
 
 const musket=new THREE.Object3D(); camera.add(musket);
 
-// Stock
-musket.add(new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.07,0.7,12),new THREE.MeshLambertMaterial({color:0x8B4513})))
-.children[0].rotation.z=Math.PI/2;
+// Stock (slimmer wood)
+const stockGeo=new THREE.CylinderGeometry(0.03,0.04,0.7,12);
+const stock=new THREE.Mesh(stockGeo,new THREE.MeshLambertMaterial({color:0x8B4513}));
+stock.rotation.z=Math.PI/2;
+stock.position.set(0,-0.05,-0.25);
+musket.add(stock);
 
-// Barrel
-const barrel=new THREE.Mesh(new THREE.CylinderGeometry(0.02,0.02,0.8,16),new THREE.MeshLambertMaterial({color:0x333333}));
-barrel.rotation.z=Math.PI/2; barrel.position.set(0,0.03,0.25); musket.add(barrel);
+// Barrel (metal)
+const barrel=new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,0.8,16),new THREE.MeshLambertMaterial({color:0x333333}));
+barrel.rotation.z=Math.PI/2; barrel.position.set(0,0.02,0.25); musket.add(barrel);
 
 // Tip
-const tip=new THREE.Mesh(new THREE.CylinderGeometry(0.022,0.022,0.05,16),new THREE.MeshLambertMaterial({color:0xaaaaaa}));
-tip.rotation.z=Math.PI/2; tip.position.set(0,0.03,0.65); musket.add(tip);
+const tip=new THREE.Mesh(new THREE.CylinderGeometry(0.016,0.016,0.05,16),new THREE.MeshLambertMaterial({color:0xaaaaaa}));
+tip.rotation.z=Math.PI/2; tip.position.set(0,0.02,0.65); musket.add(tip);
 
 // Sights
 const frontSight=new THREE.Mesh(new THREE.SphereGeometry(0.01,8,8),new THREE.MeshLambertMaterial({color:0xff0000}));
-frontSight.position.set(0,0.055,0.65); musket.add(frontSight);
+frontSight.position.set(0,0.04,0.65); musket.add(frontSight);
 const rearSight=new THREE.Mesh(new THREE.BoxGeometry(0.01,0.02,0.02),new THREE.MeshLambertMaterial({color:0x000000}));
-rearSight.position.set(0,0.055,-0.2); musket.add(rearSight);
+rearSight.position.set(0,0.04,-0.2); musket.add(rearSight);
 
 // Flash
 const muzzleFlash=new THREE.Mesh(new THREE.SphereGeometry(0.05,8,8),new THREE.MeshBasicMaterial({color:0xffaa00}));
 muzzleFlash.visible=false; musket.add(muzzleFlash);
 
-// Smoke (animated)
+// Smoke
 const smoke=new THREE.Mesh(new THREE.SphereGeometry(0.07,8,8),new THREE.MeshBasicMaterial({color:0x888888,transparent:true,opacity:0.5}));
-smoke.position.set(0,0.03,0.7); smoke.visible=false; musket.add(smoke);
+smoke.position.set(0,0.02,0.7); smoke.visible=false; musket.add(smoke);
 let smokeLife=0;
 
 // --- Sound ---
