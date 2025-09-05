@@ -130,7 +130,7 @@ const musket = new THREE.Object3D(); camera.add(musket);
 const steelBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.008,0.008,1.2,16), new THREE.MeshLambertMaterial({color:0x444444}));
 steelBarrel.rotation.x=Math.PI/2; steelBarrel.position.set(0,0,0.6); musket.add(steelBarrel);
 
-// Wooden stock (brown) under steel barrel
+// Wooden stock (brown)
 const woodenStock = new THREE.Mesh(new THREE.CylinderGeometry(0.015,0.015,1.2,16), new THREE.MeshLambertMaterial({color:0x8B4513}));
 woodenStock.rotation.x=Math.PI/2; woodenStock.position.set(0,-0.05,0.6); musket.add(woodenStock);
 
@@ -147,23 +147,43 @@ let bullets=[];
 
 // --- Ships ---
 class Ship{
-  constructor(pos){this.mesh=new THREE.Mesh(new THREE.BoxGeometry(2,0.5,4), new THREE.MeshLambertMaterial({color:0x654321}));
+  constructor(pos){
+    this.mesh=new THREE.Mesh(new THREE.BoxGeometry(2,0.5,4), new THREE.MeshLambertMaterial({color:0x654321}));
     this.mesh.position.copy(pos); scene.add(this.mesh); collidables.push(this.mesh);
-    this.sinking=false; this.speed=0; this.playerOnBoard=false; this.forward=new THREE.Vector3(0,0,1);}
+    this.sinking=false; this.playerOnBoard=false; this.forward=new THREE.Vector3(0,0,1);
+  }
   update(delta){
-    if(this.sinking){this.mesh.rotation.x+=delta*0.2; this.mesh.position.y-=delta*0.1;
-      if(this.mesh.position.y<-2){scene.remove(this.mesh); collidables.splice(collidables.indexOf(this.mesh),1); ships.splice(ships.indexOf(this),1);}
-    } else if(this.playerOnBoard){
-      if(keys["KeyW"]) this.mesh.position.add(this.forward.clone().multiplyScalar(0.1));
-      if(keys["KeyS"]) this.mesh.position.add(this.forward.clone().multiplyScalar(-0.05));
-      if(keys["KeyA"]) this.mesh.rotation.y +=0.02;
-      if(keys["KeyD"]) this.mesh.rotation.y -=0.02;
-      this.forward.set(0,0,1).applyEuler(this.mesh.rotation);
+    if(this.sinking){
+      this.mesh.rotation.x += delta*0.2; this.mesh.position.y -= delta*0.1;
+      if(this.mesh.position.y < -2){
+        scene.remove(this.mesh); collidables.splice(collidables.indexOf(this.mesh),1); ships.splice(ships.indexOf(this),1);
+      }
+      return;
     }
+    if(!this.playerOnBoard) return;
+
+    const moveVec = new THREE.Vector3();
+    if(keys["KeyW"]) moveVec.add(this.forward.clone().multiplyScalar(0.1));
+    if(keys["KeyS"]) moveVec.add(this.forward.clone().multiplyScalar(-0.05));
+
+    // Tentative collision check
+    const nextPos = this.mesh.position.clone().add(moveVec);
+    let collision = false;
+    for(let obj of collidables){
+      if(obj===this.mesh) continue;
+      const dist = nextPos.distanceTo(obj.position);
+      const radius = 1.5;
+      if(dist < radius){ collision=true; break; }
+    }
+    if(!collision) this.mesh.position.copy(nextPos);
+
+    if(keys["KeyA"]) this.mesh.rotation.y += 0.02;
+    if(keys["KeyD"]) this.mesh.rotation.y -= 0.02;
+    this.forward.set(0,0,1).applyEuler(this.mesh.rotation);
   }
   destroy(){this.sinking=true; this.playerOnBoard=false;}
-  enter(){this.playerOnBoard=true; yawObject.position.set(0,0,0);}
-  exit(){this.playerOnBoard=false; yawObject.position.copy(this.mesh.position.clone().add(new THREE.Vector3(3,0,0)));}
+  enter(){this.playerOnBoard=true; yawObject.position.set(0,1.8,0); camera.position.set(0,1.8,0);}
+  exit(){this.playerOnBoard=false; yawObject.position.copy(this.mesh.position.clone().add(new THREE.Vector3(3,0,0))); currentShip=null;}
 }
 let ships=[],currentShip=null;
 
@@ -178,8 +198,7 @@ function fireMusket(){ if(!canShoot||isReloading||!musketEquipped||ammo<=0) retu
 function reloadMusket(){if(isReloading||!musketEquipped) return; isReloading=true; setTimeout(()=>{ammo=1; isReloading=false;},7000);}
 document.addEventListener("mousedown",e=>{if(e.button===0)fireMusket(); if(e.button===2) isAiming=true;});
 document.addEventListener("mouseup",e=>{if(e.button===2) isAiming=false;});
-document
-.addEventListener("contextmenu", e => e.preventDefault());
+document.addEventListener("contextmenu", e => e.preventDefault());
 document.addEventListener("keydown", e => { 
   if(e.code==="KeyR") reloadMusket(); 
   if(e.code==="Digit1") musketEquipped = !musketEquipped; 
@@ -198,27 +217,21 @@ function spawnBullet(){
   scene.add(bullet); bullets.push(bullet);
 }
 
-// --- Check interactions ---
-let npcInRange = false;
+// --- NPC interaction ---
+let npcInRange=false;
 function checkNPCInteraction(){
   const dir = new THREE.Vector3(); camera.getWorldDirection(dir);
   raycaster.set(camera.getWorldPosition(new THREE.Vector3()), dir);
   const intersects = raycaster.intersectObject(npc);
   const distance = yawObject.position.distanceTo(npc.position);
-
   if(intersects.length > 0 && distance < 3){
     interactionText.style.display = "block";
     interactionText.innerText = "Press E to open market";
     npcInRange = true;
-  } else if(!currentShip || !currentShip.playerOnBoard){
-    interactionText.style.display = "none";
+  } else {
     npcInRange = false;
   }
 }
-
-document.addEventListener("keydown", (e) => {
-  if(e.code==="KeyE" && npcInRange) openMarket();
-});
 
 // --- Market ---
 function openMarket(){ 
@@ -234,17 +247,30 @@ function spawnShipNearDock(){
   ships.push(ship);
 }
 
-// --- Check ships interaction ---
-function checkShipInteraction(){
+// --- Ship interactions ---
+let ePressed = false;
+document.addEventListener("keydown", (e) => {
+  if(e.code === "KeyE" && !ePressed){
+    ePressed = true;
+    if(npcInRange) openMarket();
+    else checkShipBoarding();
+  }
+});
+document.addEventListener("keyup", (e) => { if(e.code==="KeyE") ePressed=false; });
+
+function checkShipBoarding(){
+  let nearShip=false;
   for(let ship of ships){
     const distance = yawObject.position.distanceTo(ship.mesh.position);
     if(distance<3){
-      interactionText.style.display="block";
-      interactionText.innerText = currentShip===ship ? "Press E to exit ship" : "Press E to board ship";
-      if(keys["KeyE"] && !currentShip){ currentShip=ship; ship.enter(); }
-      else if(keys["KeyE"] && currentShip===ship){ ship.exit(); currentShip=null; }
+      nearShip=true;
+      if(currentShip !== ship){ currentShip = ship; ship.enter(); }
+      else { ship.exit(); currentShip=null; }
+      break;
     }
   }
+  if(!nearShip && !npcInRange) interactionText.style.display="none";
+  else if(nearShip) interactionText.style.display="block";
 }
 
 // --- Update bullets ---
@@ -310,7 +336,7 @@ function animate(){
 
   // Interactions
   checkNPCInteraction();
-  checkShipInteraction();
+  checkShipBoarding();
 
   // Bullets
   updateBullets(delta);
