@@ -1,139 +1,155 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Blocky Naval Game</title>
-  <style>
-    body { margin: 0; overflow: hidden; }
-    canvas { display: block; }
-    #info { position: absolute; top: 10px; left: 10px; color: white; font-family: sans-serif; }
-  </style>
+<meta charset="UTF-8">
+<title>Blocky Naval Game</title>
+<style>
+body { margin:0; overflow:hidden; }
+canvas { display:block; }
+#info { position:absolute; top:10px; left:10px; color:white; font-family:sans-serif;}
+</style>
 </head>
 <body>
-  <div id="info">Click to lock mouse. WASD to move, SPACE to jump.</div>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
-  <script>
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87ceeb);
+<div id="info">Click to lock mouse. WASD to move, SPACE to jump/swim.</div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
+<script>
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x87ceeb);
 
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer();
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
 
-    // Yaw-Pitch hierarchy to prevent roll
-    const yawObject = new THREE.Object3D();
-    const pitchObject = new THREE.Object3D();
-    pitchObject.add(camera);
-    yawObject.add(pitchObject);
-    scene.add(yawObject);
+// FPS hierarchy
+const yawObject = new THREE.Object3D();
+const pitchObject = new THREE.Object3D();
+pitchObject.add(camera);
+yawObject.add(pitchObject);
+scene.add(yawObject);
+yawObject.position.set(0,1.8,5);
 
-    yawObject.position.set(0, 1.8, 5);
+// Lights
+const light = new THREE.DirectionalLight(0xffffff,1);
+light.position.set(10,20,10);
+scene.add(light);
+scene.add(new THREE.AmbientLight(0x666666));
 
-    // Lights
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(10, 20, 10);
-    scene.add(light);
-    scene.add(new THREE.AmbientLight(0x666666));
+// Island
+const island = new THREE.Mesh(
+  new THREE.BoxGeometry(20,2,20),
+  new THREE.MeshLambertMaterial({color:0x228B22})
+);
+island.position.set(0,-1,0);
+scene.add(island);
 
-    // Island
-    const island = new THREE.Mesh(
-      new THREE.BoxGeometry(20, 2, 20),
-      new THREE.MeshLambertMaterial({ color: 0x228B22 })
-    );
-    island.position.set(0, -1, 0);
-    scene.add(island);
+// Dock
+for(let i=-2;i<=2;i++){
+  const plank = new THREE.Mesh(
+    new THREE.BoxGeometry(1,0.3,2),
+    new THREE.MeshLambertMaterial({color:0x8B4513})
+  );
+  plank.position.set(i*1.2,0,-11);
+  scene.add(plank);
+}
 
-    // Dock
-    for (let i = -2; i <= 2; i++) {
-      const plank = new THREE.Mesh(
-        new THREE.BoxGeometry(1, 0.3, 2),
-        new THREE.MeshLambertMaterial({ color: 0x8B4513 })
-      );
-      plank.position.set(i * 1.2, 0, -11);
-      scene.add(plank);
+// Water
+const waterGeometry = new THREE.PlaneGeometry(200,200,100,100);
+const waterMaterial = new THREE.MeshLambertMaterial({color:0x1E90FF,side:THREE.DoubleSide});
+const water = new THREE.Mesh(waterGeometry, waterMaterial);
+water.rotation.x = -Math.PI/2;
+water.position.y = -2;
+scene.add(water);
+const waterPositions = water.geometry.attributes.position;
+
+// Player
+let player = {height:1.8,speed:0.15,swimSpeed:0.07,jumpPower:0.25,yVelocity:0,isJumping:false,isSwimming:false};
+let keys={};
+
+// Input
+document.addEventListener('keydown',e=>keys[e.code]=true);
+document.addEventListener('keyup',e=>keys[e.code]=false);
+
+// Mouse
+let mouseLocked=false;
+document.body.addEventListener("click",()=>{if(!mouseLocked)document.body.requestPointerLock();});
+document.addEventListener("pointerlockchange",()=>{mouseLocked=(document.pointerLockElement===document.body);});
+document.addEventListener("mousemove",e=>{
+  if(mouseLocked){
+    yawObject.rotation.y -= e.movementX*0.002;
+    pitchObject.rotation.x -= e.movementY*0.002;
+    pitchObject.rotation.x=Math.max(-Math.PI/2,Math.min(Math.PI/2,pitchObject.rotation.x));
+  }
+});
+
+// Animate loop
+function animate(){
+  requestAnimationFrame(animate);
+
+  const time = Date.now()*0.001;
+
+  // Waves
+  for(let i=0;i<waterPositions.count;i++){
+    const x=waterPositions.getX(i);
+    const y=waterPositions.getY(i);
+    const wave=Math.sin(x*0.15+time)*0.1 + Math.cos(y*0.15+time)*0.1;
+    waterPositions.setZ(i,wave);
+  }
+  waterPositions.needsUpdate=true;
+
+  // Movement
+  let move = new THREE.Vector3();
+  if(keys["KeyW"]) move.z -= 1;
+  if(keys["KeyS"]) move.z += 1;
+  if(keys["KeyA"]) move.x -= 1;
+  if(keys["KeyD"]) move.x += 1;
+  move.normalize();
+
+  // Check if swimming
+  player.isSwimming = (yawObject.position.y < water.position.y + 0.3);
+
+  if(player.isSwimming){
+    // Swimming movement
+    yawObject.translateX(move.x*player.swimSpeed);
+    yawObject.translateZ(move.z*player.swimSpeed);
+    // bobbing
+    player.yVelocity = Math.sin(time*3)*0.01;
+    // Jump out of water
+    if(keys["Space"]){
+      player.yVelocity = player.jumpPower;
+      player.isSwimming = false;
     }
-
-    // Water
-    const waterGeometry = new THREE.PlaneGeometry(200, 200, 100, 100);
-    const waterMaterial = new THREE.MeshLambertMaterial({ color: 0x1E90FF, side: THREE.DoubleSide });
-    const water = new THREE.Mesh(waterGeometry, waterMaterial);
-    water.rotation.x = -Math.PI/2;
-    water.position.y = -2;
-    scene.add(water);
-    const waterPositions = water.geometry.attributes.position;
-
-    // Player
-    let player = { height: 1.8, speed: 0.15, swimSpeed: 0.07, jumpPower: 0.25, yVelocity: 0, isJumping: false, isSwimming: false };
-    let keys = {};
-
-    document.addEventListener('keydown', e => keys[e.code] = true);
-    document.addEventListener('keyup', e => keys[e.code] = false);
-
-    // Mouse
-    let mouseLocked = false;
-    document.body.addEventListener("click", () => { if(!mouseLocked) document.body.requestPointerLock(); });
-    document.addEventListener("pointerlockchange", () => { mouseLocked = (document.pointerLockElement === document.body); });
-    document.addEventListener("mousemove", e => {
-      if (mouseLocked) {
-        yawObject.rotation.y -= e.movementX * 0.002;
-        pitchObject.rotation.x -= e.movementY * 0.002;
-        pitchObject.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, pitchObject.rotation.x));
-      }
-    });
-
-    function animate() {
-      requestAnimationFrame(animate);
-
-      // Waves
-      const time = Date.now() * 0.001;
-      for (let i=0;i<waterPositions.count;i++){
-        const x = waterPositions.getX(i);
-        const y = waterPositions.getY(i);
-        const wave = Math.sin(x*0.15+time)*0.1 + Math.cos(y*0.15+time)*0.1;
-        waterPositions.setZ(i, wave);
-      }
-      waterPositions.needsUpdate = true;
-
-      // Movement
-      let move = new THREE.Vector3();
-      if(keys["KeyW"]) move.z -= 1;
-      if(keys["KeyS"]) move.z += 1;
-      if(keys["KeyA"]) move.x -= 1;
-      if(keys["KeyD"]) move.x += 1;
-      move.normalize();
-
-      // Forward/backward fixed
-      if(player.isSwimming){
-        yawObject.translateX(move.x * player.swimSpeed);
-        yawObject.translateZ(move.z * player.swimSpeed);
-        player.yVelocity = Math.sin(time*3) * 0.01;
-      } else {
-        yawObject.translateX(move.x * player.speed);
-        yawObject.translateZ(move.z * player.speed);
-
-        if(yawObject.position.y > player.height) player.yVelocity -= 0.015;
-        else { yawObject.position.y = player.height; player.yVelocity = 0; player.isJumping = false; }
-
-        if(keys["Space"] && yawObject.position.y <= player.height + 0.01){
-          player.yVelocity = player.jumpPower;
-          player.isJumping = true;
-        }
-      }
-      yawObject.position.y += player.yVelocity;
-
-      // Swimming check
-      player.isSwimming = (yawObject.position.y < -1.8);
-
-      renderer.render(scene, camera);
+  } else {
+    // Walking
+    yawObject.translateX(move.x*player.speed);
+    yawObject.translateZ(move.z*player.speed);
+    // Gravity
+    if(yawObject.position.y > player.height){
+      player.yVelocity -= 0.015;
+    } else {
+      yawObject.position.y = player.height;
+      player.yVelocity = 0;
+      player.isJumping = false;
     }
-    animate();
+    // Jump
+    if(keys["Space"] && yawObject.position.y <= player.height + 0.01){
+      player.yVelocity = player.jumpPower;
+      player.isJumping = true;
+    }
+  }
 
-    window.addEventListener("resize", ()=>{
-      camera.aspect = window.innerWidth/window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-  </script>
+  yawObject.position.y += player.yVelocity;
+
+  renderer.render(scene,camera);
+}
+animate();
+
+// Resize
+window.addEventListener("resize",()=>{
+  camera.aspect=window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth,window.innerHeight);
+});
+</script>
 </body>
 </html>
