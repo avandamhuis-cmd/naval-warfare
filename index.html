@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Naval Game Musket with ADS</title>
+<title>Naval Game Musket with Bullet Collision</title>
 <style>
 body { margin:0; overflow:hidden; }
 canvas { display:block; }
@@ -17,7 +17,7 @@ canvas { display:block; }
 </style>
 </head>
 <body>
-<div id="info">Click to lock mouse. WASD move, SPACE jump/swim, Right Click fire, Left Click aim, R reload, 1 equip/unequip musket</div>
+<div id="info">Click to lock mouse. WASD move, SPACE jump/swim, Left Click fire, Right Click aim, R reload, 1 equip/unequip musket</div>
 <div id="inventory">Musket <span id="status"></span> <span id="reload"></span></div>
 <script src="https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.min.js"></script>
 <script>
@@ -50,9 +50,12 @@ const island = new THREE.Mesh(
   new THREE.MeshLambertMaterial({color:0x228B22})
 );
 island.position.set(0,-1,0);
+island.geometry.computeBoundingSphere();
 scene.add(island);
 
 // --- Dock ---
+const dockPlanks = [];
+const dockPillars = [];
 for(let i=-4;i<=4;i++){
   for(let j=0;j<3;j++){
     const plank = new THREE.Mesh(
@@ -60,7 +63,9 @@ for(let i=-4;i<=4;i++){
       new THREE.MeshLambertMaterial({color:0x8B4513})
     );
     plank.position.set(i*1.2,0,j*1.5-11);
+    plank.geometry.computeBoundingSphere();
     scene.add(plank);
+    dockPlanks.push(plank);
   }
 }
 // Pillars
@@ -71,7 +76,9 @@ for(let i=-4;i<=4;i++){
       new THREE.MeshLambertMaterial({color:0x654321})
     );
     pillar.position.set(i*1.2,-2+j*2,-11);
+    pillar.geometry.computeBoundingSphere();
     scene.add(pillar);
+    dockPillars.push(pillar);
   }
 }
 
@@ -122,30 +129,39 @@ const adsPosition = new THREE.Vector3(0,-0.02,-0.3);
 const musket = new THREE.Object3D();
 camera.add(musket);
 
-// Musket parts
-const musketStock = new THREE.Mesh(
-  new THREE.BoxGeometry(0.1,0.2,0.6),
+// Stock
+const stock = new THREE.Mesh(
+  new THREE.BoxGeometry(0.12,0.18,0.6),
   new THREE.MeshLambertMaterial({color:0x8B4513})
 );
-musketStock.position.set(0,-0.05,-0.3);
-musket.add(musketStock);
+stock.position.set(0,-0.05,-0.3);
+musket.add(stock);
 
-const musketBarrel = new THREE.Mesh(
-  new THREE.BoxGeometry(0.05,0.05,0.5),
+// Barrel (round cylinder)
+const barrel = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.025,0.025,0.7,16),
   new THREE.MeshLambertMaterial({color:0x333333})
 );
-musketBarrel.position.set(0,0.05,0.25);
-musket.add(musketBarrel);
+barrel.rotation.x=Math.PI/2;
+barrel.position.set(0,0.05,0.1);
+musket.add(barrel);
 
-// Sight for aiming
+// Tip (metal)
+const tip = new THREE.Mesh(
+  new THREE.CylinderGeometry(0.03,0.03,0.05,16),
+  new THREE.MeshLambertMaterial({color:0xaaaaaa})
+);
+tip.rotation.x=Math.PI/2;
+tip.position.set(0,0.05,0.45);
+musket.add(tip);
+
+// Sight
 const sight = new THREE.Mesh(
   new THREE.BoxGeometry(0.02,0.02,0.05),
   new THREE.MeshLambertMaterial({color:0xffff00})
 );
-sight.position.set(0,0.07,0.45);
+sight.position.set(0,0.07,0.35);
 musket.add(sight);
-
-musket.position.copy(equipPosition);
 
 // Muzzle flash
 const muzzleFlash = new THREE.Mesh(
@@ -160,6 +176,7 @@ const smoke = new THREE.Mesh(
   new THREE.SphereGeometry(0.07,8,8),
   new THREE.MeshBasicMaterial({color:0x888888,transparent:true,opacity:0.5})
 );
+smoke.position.set(0,0.05,0.5);
 smoke.visible=false;
 musket.add(smoke);
 
@@ -173,7 +190,49 @@ audioLoader.load('https://actions.google.com/sounds/v1/weapons/musket.ogg', func
   musketSound.setVolume(0.5);
 });
 
-// --- Functions ---
+// --- Bullets ---
+let bullets = [];
+const collidables = [island, ...dockPlanks, ...dockPillars];
+
+function spawnBullet(){
+  const geometry = new THREE.SphereGeometry(0.05,8,8);
+  const material = new THREE.MeshLambertMaterial({color:0x888888});
+  const bullet = new THREE.Mesh(geometry,material);
+  const tipWorldPos = new THREE.Vector3();
+  tip.getWorldPosition(tipWorldPos);
+  bullet.position.copy(tipWorldPos);
+  const direction = new THREE.Vector3();
+  camera.getWorldDirection(direction);
+  direction.normalize();
+  bullet.userData = { velocity: direction.multiplyScalar(1), spawnTime: performance.now() };
+  scene.add(bullet);
+  bullets.push(bullet);
+}
+
+function updateBullets(delta){
+  const now = performance.now();
+  for(let i=bullets.length-1;i>=0;i--){
+    const b = bullets[i];
+    b.position.add(b.userData.velocity.clone().multiplyScalar(delta*60));
+
+    let hit=false;
+    for(let j=0;j<collidables.length;j++){
+      const obj = collidables[j];
+      const radius = 0.05 + (obj.geometry.boundingSphere?.radius || 1);
+      if(b.position.distanceTo(obj.position) < radius){
+        hit=true;
+        break;
+      }
+    }
+
+    if(hit || now-b.userData.spawnTime>3000){
+      scene.remove(b);
+      bullets.splice(i,1);
+    }
+  }
+}
+
+// --- Fire & Reload ---
 function fireMusket(){
   if(!canShoot || isReloading || !musketEquipped || ammo<=0) return;
   ammo--;
@@ -181,7 +240,10 @@ function fireMusket(){
   smoke.visible=true;
   if(musketSound.isPlaying) musketSound.stop();
   musketSound.play();
-  setTimeout(()=>{muzzleFlash.visible=false; smoke.visible=false},200);
+  spawnBullet();
+  // Recoil
+  musket.position.add(new THREE.Vector3(0,0.02,0.05));
+  setTimeout(()=>{muzzleFlash.visible=false; smoke.visible=false},300);
 }
 
 function reloadMusket(){
@@ -205,17 +267,17 @@ function reloadMusket(){
   },1000);
 }
 
-// Mouse buttons
-document.addEventListener("mousedown",e=>{
-  if(e.button===0 && musketEquipped) isAiming = true;
-  if(e.button===2) fireMusket();
+// Mouse controls
+document.addEventListener("mousedown", e=>{
+  if(e.button===2 && musketEquipped) isAiming = true;
+  if(e.button===0) fireMusket();
 });
-document.addEventListener("mouseup",e=>{
-  if(e.button===0) isAiming = false;
+document.addEventListener("mouseup", e=>{
+  if(e.button===2) isAiming = false;
 });
 document.addEventListener("contextmenu",e=>e.preventDefault());
 
-// 1 key toggle equip/unequip, R reload
+// Equip/unequip and reload
 document.addEventListener("keydown",e=>{
   if(e.code==="Digit1" && !isReloading) musketEquipped = !musketEquipped;
   if(e.code==="KeyR") reloadMusket();
@@ -243,6 +305,7 @@ function animate(){
   if(keys["KeyD"]) move.x+=1;
   move.normalize();
 
+  // Swimming
   player.isSwimming = (yawObject.position.y < water.position.y + 0.3);
   if(player.isSwimming){
     yawObject.translateX(move.x*player.swimSpeed);
@@ -258,7 +321,7 @@ function animate(){
   }
   yawObject.position.y += player.yVelocity;
 
-  // Musket position (ADS/equip/holster)
+  // Musket position
   let targetPos;
   if(musketEquipped){
     targetPos = isAiming ? adsPosition : equipPosition;
@@ -267,7 +330,10 @@ function animate(){
   }
   musket.position.lerp(targetPos, 0.1);
 
-  // Update Inventory
+  // Update bullets
+  updateBullets(0.016);
+
+  // Inventory
   statusUI.innerText = musketEquipped ? "[Equipped]" : "[On Back]";
   renderer.render(scene,camera);
 }
