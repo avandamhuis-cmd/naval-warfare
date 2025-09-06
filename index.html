@@ -1,80 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Naval War Game</title>
-  <style>
-    body { margin: 0; overflow: hidden; font-family: sans-serif; }
-    #interactionText {
-      position: absolute;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: white;
-      font-size: 18px;
-      padding: 5px 10px;
-      background: rgba(0,0,0,0.5);
-      border-radius: 5px;
-      display: none;
-    }
-    #market {
-      position: absolute;
-      top: 50px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(34,34,34,0.95);
-      color: white;
-      padding: 15px;
-      border-radius: 5px;
-      display: none;
-      min-width: 200px;
-      text-align: center;
-    }
-    #market button {
-      margin-top: 10px;
-      padding: 8px 12px;
-      font-size: 16px;
-      cursor: pointer;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>Naval War Game</title>
+<style>
+body { margin: 0; overflow: hidden; font-family: sans-serif; }
+#interactionText {
+  position: absolute; top: 20px; left: 50%;
+  transform: translateX(-50%); color: white;
+  font-size: 18px; padding: 5px 10px;
+  background: rgba(0,0,0,0.5); border-radius: 5px;
+  display: none;
+}
+#market {
+  position: absolute; top: 50px; left: 50%;
+  transform: translateX(-50%);
+  background: rgba(34,34,34,0.95); color: white;
+  padding: 15px; border-radius: 5px; text-align: center;
+  display: none; min-width: 200px;
+}
+#market button { margin-top: 10px; padding: 8px 12px; font-size: 16px; cursor: pointer; }
+</style>
 </head>
 <body>
-  <!-- Interaction text (Press E) -->
-  <div id="interactionText"></div>
-
-  <!-- Market UI -->
-  <div id="market">
-    <div>Welcome to the Market</div>
-    <div>Gold: <span id="goldDisplay">100</span></div>
-    <button id="buyShipBtn">Buy Small Ship (50 Gold)</button>
-    <button id="closeMarketBtn">Close</button>
-  </div>
-
-  <!-- Three.js script -->
-  <script type="module" src="main.js"></script>
-
-  <script>
-    // Simple market buttons
-    const buyBtn = document.getElementById("buyShipBtn");
-    const closeBtn = document.getElementById("closeMarketBtn");
-    const goldDisplay = document.getElementById("goldDisplay");
-
-    buyBtn.addEventListener("click", () => {
-      if (window.playerGold >= 50) {
-        window.playerGold -= 50;
-        goldDisplay.innerText = window.playerGold;
-        // Spawn ship near dock
-        if (window.shipSystem) {
-          window.shipSystem.spawnShip(new THREE.Vector3(0, 0, 20));
-        }
-      } else {
-        alert("Not enough gold!");
-      }
-    });
-
-    closeBtn.addEventListener("click", () => {
-      document.getElementById("market").style.display = "none";
-    });
-  </script>
+<div id="interactionText"></div>
+<div id="market">
+  <div>Welcome to the Market</div>
+  <div>Gold: <span id="goldDisplay">100</span></div>
+  <button id="buyShipBtn">Buy Small Ship (50 Gold)</button>
+  <button id="closeMarketBtn">Close</button>
+</div>
+<script type="module" src="main.js"></script>
 </body>
 </html>
