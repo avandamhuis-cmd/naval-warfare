@@ -1,1 +1,51 @@
+// Simple HUD / style manager for your game
 
+export class StyleManager {
+  constructor() {
+    // Grab HUD elements
+    this.interactionText = document.getElementById("interactionText");
+    this.marketUI = document.getElementById("market");
+    this.goldDisplay = document.getElementById("goldDisplay");
+
+    // Default style setup
+    this.interactionText.style.fontFamily = "Arial, sans-serif";
+    this.interactionText.style.fontSize = "18px";
+    this.interactionText.style.padding = "5px 10px";
+    this.interactionText.style.background = "rgba(0,0,0,0.5)";
+    this.interactionText.style.borderRadius = "5px";
+    this.interactionText.style.color = "white";
+    this.interactionText.style.display = "none";
+
+    this.marketUI.style.fontFamily = "Arial, sans-serif";
+    this.marketUI.style.fontSize = "16px";
+    this.marketUI.style.background = "rgba(34,34,34,0.95)";
+    this.marketUI.style.color = "white";
+    this.marketUI.style.padding = "15px";
+    this.marketUI.style.borderRadius = "5px";
+    this.marketUI.style.textAlign = "center";
+    this.marketUI.style.display = "none";
+  }
+
+  updateGold(amount) {
+    if (this.goldDisplay) this.goldDisplay.innerText = amount;
+  }
+
+  showInteraction(text) {
+    if (this.interactionText) {
+      this.interactionText.style.display = "block";
+      this.interactionText.innerText = text;
+    }
+  }
+
+  hideInteraction() {
+    if (this.interactionText) this.interactionText.style.display = "none";
+  }
+
+  showMarket() {
+    if (this.marketUI) this.marketUI.style.display = "block";
+  }
+
+  hideMarket() {
+    if (this.marketUI) this.marketUI.style.display = "none";
+  }
+}
