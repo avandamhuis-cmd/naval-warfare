@@ -1,6 +1,10 @@
 export class Water {
   constructor(scene) {
-    const geometry = new THREE.PlaneGeometry(1000, 1000, 128, 128);
+    this.width = 1000;
+    this.height = 1000;
+
+    // Plane for water
+    const geometry = new THREE.PlaneGeometry(this.width, this.height, 128, 128);
     const material = new THREE.MeshPhongMaterial({
       color: 0x1e90ff,
       transparent: true,
@@ -18,14 +22,13 @@ export class Water {
   }
 
   update() {
-    this.time += 0.015; // slower waves
+    this.time += 0.015;
 
     const pos = this.geometry.attributes.position;
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i);
       const y = pos.getY(i);
 
-      // Larger wave height and smoother motion
       const waveHeight =
         Math.sin(x * 0.05 + this.time) * 1.2 +
         Math.cos(y * 0.05 + this.time * 0.8) * 1.2;
@@ -34,5 +37,13 @@ export class Water {
     }
     pos.needsUpdate = true;
     this.geometry.computeVertexNormals();
+  }
+
+  // NEW: Get water height at a given world (x, z)
+  getHeightAt(x, z) {
+    return (
+      Math.sin(x * 0.05 + this.time) * 1.2 +
+      Math.cos(z * 0.05 + this.time * 0.8) * 1.2
+    );
   }
 }
